@@ -51,7 +51,7 @@ def number(value, places):
     return format(n, f".{places}f")
 
 
-def convert(source):
+def convert(source, remove_missing=False):
     rows = csv.reader(io.StringIO(source.lstrip("\ufeff")), strict=True)
     indices = None
     names, ids, dates, records = set(), set(), [], []
@@ -82,13 +82,20 @@ def convert(source):
             raise ValueError("Select a CSV containing a single storm.")
         try:
             time = timestamp(raw_time)
+            lat, lon = number(lat, 2), number(lon, 2)
+            wind, pressure = number(wind, 0), number(pressure, 0)
+            if remove_missing and (name.upper() in MISSING or time is None
+                                   or "9999" in (lat, lon, wind, pressure)):
+                continue
             if time:
                 dates.append(time.date())
             clock = time.strftime("%m/%d/%HZ") if time else "9999"
             adv = len(records) + 1
-            records.append(f"{adv:3} {number(lat, 2):>6} {number(lon, 2):>7} {clock:>9} {number(wind, 0):>4} {number(pressure, 0):>5}")
+            records.append(f"{adv:3} {lat:>6} {lon:>7} {clock:>9} {wind:>4} {pressure:>5}")
         except (ValueError, InvalidOperation) as error:
             raise ValueError(f"CSV line {rows.line_num}: {error}") from error
+    if not records and remove_missing:
+        raise ValueError("No complete track records remain.")
     if not records:
         raise ValueError("No track records found.")
     return "\n".join([f"Date: {period(dates)}", next(iter(names), "9999"),
