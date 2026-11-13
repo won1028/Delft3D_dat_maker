@@ -6,7 +6,7 @@
 .file-input{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}.file-input:focus-visible+.choose{outline:3px solid #124b88;outline-offset:3px}.choose{display:inline-block}#selected{overflow-wrap:anywhere}
 </style></head><body><header><b>Delft3D</b> &nbsp;/&nbsp; Track tools</header>
 <main><h1>Typhoon Track Converter</h1><p>Convert an IBTrACS track from CSV to Delft3D DAT format.</p>
-<section class="panel"><h2>Input file</h2><div class="pick"><input type="file" id="csv" accept=".csv,text/csv" class="file-input"><label for="csv" class="choose">Choose CSV file</label> <span id="selected">No file selected</span></div><p id="status" role="status">Select a CSV containing one storm track.</p></section>
+<section class="panel"><h2>Input file</h2><div class="pick"><input type="file" id="csv" accept=".csv,text/csv" class="file-input"><label for="csv" class="choose">Choose CSV file</label> <span id="selected">No file selected</span></div><label style="display:block;margin-top:16px"><input id="remove-missing" type="checkbox"> Remove rows with missing values</label><p id="status" role="status">Select a CSV containing one storm track.</p></section>
 <section class="panel"><div class="bar"><h2>DAT preview</h2><button id="save" disabled>Download DAT</button></div><pre id="preview" tabindex="0">ADV  LAT   LON       TIME     WIND  PR</pre><small>Time (UTC) · Wind speed (kt) · Central pressure (mb) · Missing value: 9999</small></section></main>
 <script src="https://cdn.jsdelivr.net/pyodide/v0.27.7/full/pyodide.js" defer></script>
 <script>
@@ -22,7 +22,8 @@ async function initialize(){
   py.runPython(await response.text());
   return py.globals.get('convert');
 }
-input.onchange = async () => {
+const removeMissing = document.querySelector('#remove-missing');
+async function refresh() {
   const id = ++generation, file = input.files[0];
   document.querySelector("#selected").textContent = file ? file.name : "No file selected";
   output = ''; save.disabled = true; preview.textContent = heading;
@@ -33,13 +34,15 @@ input.onchange = async () => {
     if (id !== generation) return;
     const source = await file.text();
     if (id !== generation) return;
-    output = convert(source);
+    output = convert(source, removeMissing.checked);
     filename = file.name.replace(/\.csv$/i,'') + '.dat';
     preview.textContent = output;
     statusText.textContent = filename + ' · Track records: ' + (output.split('\n').length-3);
     save.disabled = false;
   } catch (e) {if (id === generation) statusText.textContent = 'Conversion error: ' + String(e.message || e).trim().split('\n').pop();}
-};
+}
+input.onchange = refresh;
+removeMissing.onchange = refresh;
 save.onclick = () => {
   const url = URL.createObjectURL(new Blob([output],{type:'text/plain;charset=utf-8'}));
   const link = document.createElement('a'); link.href = url; link.download = filename;
