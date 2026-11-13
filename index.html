@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Delft3D · 태풍 경로 변환기</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#f3f6f5;color:#152f35;font:16px/1.6 "Inter",system-ui,sans-serif}header{background:#163a40;color:white;padding:17px max(6vw,24px);font-size:15px;letter-spacing:.04em}header b{color:#85e5cb}main{max-width:1060px;margin:65px auto;padding:0 24px}h1{font-size:clamp(30px,5vw,49px);letter-spacing:-.065em;line-height:1.15;margin:0 0 14px}p{color:#52676c;margin:0 0 32px}.panel{border:1px solid #c8d5d3;background:white;border-radius:12px;padding:24px;margin:18px 0}h2{font-size:18px;margin:0 0 16px}.pick{background:#eaf5f1;border:1px dashed #7fae9f;padding:24px;border-radius:6px;display:block}input{max-width:100%;font:inherit}input::file-selector-button,button{border:0;background:#126352;color:white;font:inherit;font-weight:650;border-radius:5px;padding:9px 16px;margin-right:12px;cursor:pointer}button:disabled{background:#d1dad8;color:#50625e;cursor:default}.bar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}.bar h2{margin:0}pre{border-radius:6px;background:#163439;color:#d9eee8;padding:18px;max-height:340px;min-height:120px;overflow:auto;font:14px/1.6 "IBM Plex Mono",monospace}small{color:#506563}#status{margin:12px 0 0;overflow-wrap:anywhere}
+</style></head><body><header><b>Delft3D</b> &nbsp;/&nbsp; Track tools</header>
+<main><h1>태풍 경로 변환기</h1><p>IBTrACS CSV를 선택하면 Delft3D용 DAT 파일을 생성합니다.</p>
+<section class="panel"><h2><label for="csv">입력 파일</label></h2><div class="pick"><input type="file" id="csv" accept=".csv,text/csv"></div><p id="status" role="status">태풍 한 개의 경로가 담긴 CSV를 선택하세요.</p></section>
+<section class="panel"><div class="bar"><h2>DAT 미리보기</h2><button id="save" disabled>DAT 다운로드</button></div><pre id="preview" tabindex="0">ADV  LAT   LON       TIME     WIND  PR</pre><small>시간 기준 UTC · 풍속 kt · 중심기압 mb · 결측값 9999</small></section></main>
+<script src="https://cdn.jsdelivr.net/pyodide/v0.27.7/full/pyodide.js" defer></script>
+<script>
+const input = document.querySelector('#csv'), save = document.querySelector('#save');
+const preview = document.querySelector('#preview'), statusText = document.querySelector('#status');
+const heading = preview.textContent;
+let runtime, output, filename, generation = 0;
+async function initialize(){
+  if (!window.loadPyodide) throw Error('Python 실행 환경을 불러오지 못했습니다. 인터넷 연결을 확인한 뒤 새로고침하세요.');
+  const py = await loadPyodide();
+  const response = await fetch('./converter.py');
+  if (!response.ok) throw Error('converter.py 로드 실패');
+  py.runPython(await response.text());
+  return py.globals.get('convert');
+}
+input.onchange = async () => {
+  const id = ++generation, file = input.files[0];
+  output = ''; save.disabled = true; preview.textContent = heading;
+  if (!file) {statusText.textContent = 'CSV를 선택하세요.';return;}
+  statusText.textContent = 'Python 변환기를 준비하고 있습니다…';
+  try {
+    const convert = await (runtime ??= initialize().catch(e => {runtime = undefined; throw e;}));
+    if (id !== generation) return;
+    const source = await file.text();
+    if (id !== generation) return;
+    output = convert(source);
+    filename = file.name.replace(/\.csv$/i,'') + '.dat';
+    preview.textContent = output;
+    statusText.textContent = filename + ' · 관측 ' + (output.split('\n').length-3) + '행';
+    save.disabled = false;
+  } catch (e) {if (id === generation) statusText.textContent = '변환 오류 · ' + String(e.message || e).trim().split('\n').pop();}
+};
+save.onclick = () => {
+  const url = URL.createObjectURL(new Blob([output],{type:'text/plain;charset=utf-8'}));
+  const link = document.createElement('a'); link.href = url; link.download = filename;
+  link.click(); setTimeout(()=>URL.revokeObjectURL(url),30000);
+};
+</script></body></html>
