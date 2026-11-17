@@ -52,4 +52,20 @@ save.onclick = () => {
   const link = document.createElement('a'); link.href = url; link.download = filename;
   link.click(); setTimeout(()=>URL.revokeObjectURL(url),30000);
 };
-</script><script type="module" src="./timezone-tool.js"></script></body></html>
+</script><script>
+(function(){
+  for(const name of ['track','zone']){
+    document.getElementById(name+'-tab').addEventListener('click',function(){
+      for(const n of ['track','zone']){
+        document.getElementById(n+'-tab').setAttribute('aria-selected',String(n===name));
+        document.getElementById(n+'-page').hidden=n!==name;
+      }
+    });
+  }
+  const status=document.getElementById('zone-status');
+  import('./timezone-tool.js?v=2').catch(function(error){
+    status.textContent='Timezone tool failed to load. Refresh the page (Ctrl+F5). '+error.message;
+    document.getElementById('zone-pick').disabled=true;
+  });
+})();
+</script></body></html>
