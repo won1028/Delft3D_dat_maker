@@ -51,10 +51,12 @@ def number(value, places):
     return format(n, f".{places}f")
 
 
-def convert(source, remove_missing=False):
+def convert(source, fill_blanks=True, remove_repeats=False):
     rows = csv.reader(io.StringIO(source.lstrip("\ufeff")), strict=True)
     indices = None
     names, ids, dates, records = set(), set(), [], []
+    last_wind = last_pressure = "9999"
+    previous_pair = None
     for row in rows:
         row = [cell.strip() for cell in row]
         if not any(row):
@@ -83,9 +85,16 @@ def convert(source, remove_missing=False):
         try:
             time = timestamp(raw_time)
             lat, lon = number(lat, 2), number(lon, 2)
-            wind, pressure = number(wind, 0), number(pressure, 0)
-            if remove_missing and (name.upper() in MISSING or time is None
-                                   or "9999" in (lat, lon, wind, pressure)):
+            wind = last_wind if fill_blanks and not wind else number(wind, 0)
+            pressure = last_pressure if fill_blanks and not pressure else number(pressure, 0)
+            if wind != "9999":
+                last_wind = wind
+            if pressure != "9999":
+                last_pressure = pressure
+            pair = (wind, pressure)
+            repeated = pair == previous_pair
+            previous_pair = pair
+            if remove_repeats and repeated:
                 continue
             if time:
                 dates.append(time.date())
@@ -94,8 +103,6 @@ def convert(source, remove_missing=False):
             records.append(f"{adv:3} {lat:>6} {lon:>7} {clock:>9} {wind:>4} {pressure:>5}")
         except (ValueError, InvalidOperation) as error:
             raise ValueError(f"CSV line {rows.line_num}: {error}") from error
-    if not records and remove_missing:
-        raise ValueError("No complete track records remain.")
     if not records:
         raise ValueError("No track records found.")
     return "\n".join([f"Date: {period(dates)}", next(iter(names), "9999"),
