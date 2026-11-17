@@ -21,7 +21,7 @@ jobs:
       - uses: actions/configure-pages@v5
         with:
           enablement: true
-      - run: mkdir public && cp index.html converter.py public/
+      - run: mkdir public && cp index.html converter.py nefis-time.js timezone-tool.js public/
       - uses: actions/upload-pages-artifact@v3
         with:
           path: public
