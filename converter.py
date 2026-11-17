@@ -51,7 +51,7 @@ def number(value, places):
     return format(n, f".{places}f")
 
 
-def convert(source, fill_blanks=True, remove_repeats=False):
+def convert(source, include_missing=True, remove_repeats=False):
     rows = csv.reader(io.StringIO(source.lstrip("\ufeff")), strict=True)
     indices = None
     names, ids, dates, records = set(), set(), [], []
@@ -85,12 +85,14 @@ def convert(source, fill_blanks=True, remove_repeats=False):
         try:
             time = timestamp(raw_time)
             lat, lon = number(lat, 2), number(lon, 2)
-            wind = last_wind if fill_blanks and not wind else number(wind, 0)
-            pressure = last_pressure if fill_blanks and not pressure else number(pressure, 0)
+            wind = last_wind if not wind else number(wind, 0)
+            pressure = last_pressure if not pressure else number(pressure, 0)
             if wind != "9999":
                 last_wind = wind
             if pressure != "9999":
                 last_pressure = pressure
+            if not include_missing and (time is None or "9999" in (lat, lon, wind, pressure)):
+                continue
             pair = (wind, pressure)
             repeated = pair == previous_pair
             previous_pair = pair
